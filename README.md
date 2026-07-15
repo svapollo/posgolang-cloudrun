@@ -62,3 +62,6 @@ curl "http://localhost:8080/?cep=00000000"
 go test ./...
 ```
 
+## Endereço no Cloud Run
+
+https://meu-servico-go-844400674830.us-central1.run.app/
