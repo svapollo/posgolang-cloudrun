@@ -8,9 +8,14 @@ import (
 )
 
 func main() {
+	apiKey := os.Getenv("WEATHER_API_KEY")
+	if apiKey == "" {
+		apiKey = "3526bcb2539d4e95b08181934260907"
+	}
+
 	app := NewApp(
 		NewZipcodeClient(http.DefaultClient, "https://viacep.com.br"),
-		NewWeatherClient(http.DefaultClient, "https://api.weatherapi.com/v1", os.Getenv("WEATHER_API_KEY")),
+		NewWeatherClient(http.DefaultClient, "https://api.weatherapi.com/v1", apiKey),
 	)
 
 	port := os.Getenv("PORT")
