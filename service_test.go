@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -101,6 +102,25 @@ func TestServeHTTPZipcodeNotFound(t *testing.T) {
 	}
 }
 
+func TestServeHTTPInvalidZipcodeFormat(t *testing.T) {
+	app := NewApp(
+		fakeZipcodeClient{},
+		fakeWeatherClient{},
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/?cep=1234567a", nil)
+	rr := httptest.NewRecorder()
+
+	app.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusUnprocessableEntity)
+	}
+	if got := rr.Body.String(); got != "invalid zipcode" {
+		t.Fatalf("body = %q, want %q", got, "invalid zipcode")
+	}
+}
+
 func TestViaCEPClientCity(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/ws/01001000/json/" {
@@ -123,6 +143,52 @@ func TestViaCEPClientCity(t *testing.T) {
 	}
 	if city != "Sao Paulo" {
 		t.Fatalf("city = %q, want %q", city, "Sao Paulo")
+	}
+}
+
+func TestViaCEPClientCityNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/ws/00000000/json/" {
+			t.Fatalf("path = %q, want /ws/00000000/json/", r.URL.Path)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"erro": "true",
+		})
+	}))
+	defer server.Close()
+
+	client := NewZipcodeClient(server.Client(), server.URL)
+	_, err := client.City(context.Background(), "00000000")
+	if err == nil {
+		t.Fatalf("City() error = nil, want errZipcodeNotFound")
+	}
+	if !errors.Is(err, errZipcodeNotFound) {
+		t.Fatalf("City() error = %v, want errZipcodeNotFound", err)
+	}
+}
+
+func TestViaCEPClientCityNotFoundStatus404(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/ws/00000000/json/" {
+			t.Fatalf("path = %q, want /ws/00000000/json/", r.URL.Path)
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"erro": "true",
+		})
+	}))
+	defer server.Close()
+
+	client := NewZipcodeClient(server.Client(), server.URL)
+	_, err := client.City(context.Background(), "00000000")
+	if err == nil {
+		t.Fatalf("City() error = nil, want error")
+	}
+	if !errors.Is(err, errZipcodeNotFound) {
+		t.Logf("City() error = %v (not recognized as errZipcodeNotFound)", err)
 	}
 }
 

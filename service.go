@@ -149,20 +149,20 @@ func (c *viaCEPClient) City(ctx context.Context, cep string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("viacep returned status %d", resp.StatusCode)
-	}
-
 	var payload struct {
 		Localidade string `json:"localidade"`
-		Erro       bool   `json:"erro"`
+		Erro       string `json:"erro"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		return "", err
 	}
 
-	if payload.Erro || strings.TrimSpace(payload.Localidade) == "" {
+	if payload.Erro == "true" || strings.TrimSpace(payload.Localidade) == "" {
+		return "", errZipcodeNotFound
+	}
+
+	if resp.StatusCode != http.StatusOK {
 		return "", errZipcodeNotFound
 	}
 
